@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Builder</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Disable right-click context menu */
+        * {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Re-enable text selection for input fields */
+        input, textarea {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            padding: 10px;
+            gap: 10px;
+        }
+        
+        .main { 
+            flex: 1; 
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
+            padding: 10px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; /* Center the canvas horizontally */
+        }
+        
+        .sidebar { 
+            width: 240px; 
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
+            padding: 10px; 
+            max-height: calc(100vh - 20px); 
+            overflow-y: auto; 
+        }
+        
+        h1 { color: #2c3e50; margin-bottom: 10px; text-align: center; font-weight: 300; font-size: 20px; }
+        h2 { color: #34495e; margin-bottom: 6px; font-weight: 400; font-size: 14px; }
+        h3 { color: #34495e; margin-bottom: 4px; font-weight: 500; font-size: 12px; border-bottom: 1px solid #ecf0f1; padding-bottom: 2px; }
+        
+        #canvas { 
+            border: 2px solid #bdc3c7; 
+            border-radius: 5px; 
+            background: #ffffff; 
+            cursor: grab; 
+            width: 600px; /* Fixed width */
+            height: 400px; /* Fixed height */
+            max-width: 100%; /* Responsive for smaller screens */
+        }
+        #canvas.grabbing { cursor: grabbing; }
+        
+        .controls { 
+            background: #f8f9fa; 
+            border-radius: 5px; 
+            padding: 6px; 
+            margin-top: 10px; 
+            width: 100%; 
+            max-width: 600px; /* Match canvas width */
+        }
+        .row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+        .info { font-size: 10px; color: #2c3e50; font-weight: 500; }
+        
+        button {
+            background: #3498db; color: white; border: none; padding: 4px 8px; border-radius: 3px;
+            cursor: pointer; font-size: 10px; transition: background 0.3s; font-weight: 500;
+        }
+        button:hover { background: #2980b9; }
+        button.success { background: #27ae60; } button.success:hover { background: #229954; }
+        button.warning { background: #f39c12; } button.warning:hover { background: #e67e22; }
+        button.danger { background: #e74c3c; } button.danger:hover { background: #c0392b; }
+        
+        .section { background: #f8f9fa; border-radius: 4px; padding: 6px; margin-bottom: 6px; border: 1px solid #dee2e6; }
+        .add-section { background: #e8f5e8; border: 1px solid #d4edda; }
+        
+        .collapsible-section {
+            background: #f8f9fa; border-radius: 4px; margin-bottom: 6px; border: 1px solid #dee2e6;
+        }
+        
+        .section-header {
+            display: flex; justify-content: space-between; align-items: center; padding: 6px;
+            cursor: pointer; background: #e9ecef; border-radius: 3px 3px 0 0;
+        }
+        
+        .section-header:hover { background: #dee2e6; }
+        
+        .section-content {
+            padding: 6px; display: block;
+        }
+        
+        .section-content.collapsed { display: none; }
+        
+        .toggle-icon {
+            font-size: 10px; color: #6c757d; transition: transform 0.3s;
+        }
+        
+        .toggle-icon.collapsed { transform: rotate(-90deg); }
+        
+        .speed-control {
+            display: flex; align-items: center; gap: 4px;
+        }
+        
+        .speed-slider {
+            width: 60px; height: 12px;
+        }
+        
+        .item { background: white; border: 1px solid #dee2e6; border-radius: 3px; padding: 4px; margin-bottom: 3px; transition: all 0.3s; }
+        .item.selected { border-color: #3498db; background: #e3f2fd; }
+        .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+        .item-title { font-weight: 600; color: #2c3e50; font-size: 11px; }
+        
+        input[type="number"], input[type="text"], select {
+            padding: 1px; border: 1px solid #bdc3c7; border-radius: 2px; font-size: 9px;
+            background: white; width: 35px; text-align: center;
+        }
+        input[type="number"]:focus, input[type="text"]:focus, select:focus {
+            outline: none; border-color: #3498db; box-shadow: 0 0 0 1px rgba(52, 152, 219, 0.3);
+        }
+        
+        select {
+            width: 80px;
+            font-size: 8px;
+            padding: 2px;
+        }
+        
+        .coord-group { display: flex; align-items: end; gap: 2px; }
+        .coord { display: flex; flex-direction: column; gap: 1px; align-items: center; }
+        .label { font-size: 7px; font-weight: 600; color: #7f8c8d; text-transform: uppercase; }
+        .coords { display: flex; gap: 2px; }
+        
+        .plane-inputs { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 3px; }
+        .plane-input { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+        .plane-input input { width: 25px; }
+        .plane-input label { font-size: 6px; color: #7f8c8d; font-weight: 600; }
+        
+        .checkbox { display: flex; align-items: center; gap: 3px; }
+        input[type="checkbox"] { width: 10px; height: 10px; }
+        label { font-size: 10px; color: #2c3e50; }
+        
+        .empty { text-align: center; color: #7f8c8d; font-style: italic; padding: 8px; background: #f8f9fa; border-radius: 3px; border: 2px dashed #bdc3c7; font-size: 9px; }
+        .plane-controls { display: flex; gap: 2px; margin-bottom: 3px; }
+    </style>
+</head>
+<body>
+    <div class="main">
+        <h1>3D Model Builder</h1>
+        <canvas id="canvas" width="600" height="400"></canvas>
+        
+        <div class="controls">
+            <div class="row">
+                <span class="info" id="stats">Vertices: 0 | Planes: 0</span>
+                <span class="info" id="rotation">0°, 0°</span>
+            </div>
+            <div class="row">
+                <button onclick="resetView()">Reset</button>
+                <button onclick="clearAll()" class="danger">Clear</button>
+                <button onclick="snapToGrid()" class="warning">Snap to Grid</button>
+                <button onclick="savePNG()" class="success">Save PNG</button>
+                <div class="checkbox">
+                    <input type="checkbox" id="autoRotate" onchange="toggleAutoRotate()">
+                    <label for="autoRotate">Auto Rotate</label>
+                </div>
+                <div class="speed-control">
+                    <label style="font-size: 8px;">Speed:</label>
+                    <input type="range" id="rotationSpeed" class="speed-slider" min="0.1" max="3" step="0.1" value="1" onchange="updateSpeed()">
+                    <span id="speedValue" style="font-size: 8px;">1x</span>
+                </div>
+                <select id="rotationType" onchange="updateRotationType()">
+                    <option value="tumble">Tumble</option>
+                    <option value="spinX">Spin X</option>
+                    <option value="spinY">Spin Y</option>
+                    <option value="spinZ">Spin Z</option>
+                    <option value="orbit">Orbit</option>
+                    <option value="wobble">Wobble</option>
+                </select>
+                <div class="checkbox">
+                    <input type="checkbox" id="shadingMode" onchange="toggleShading()">
+                    <label for="shadingMode">3D Shading</label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="speed-control">
+                    <label style="font-size: 8px;">X Rotation:</label>
+                    <input type="range" id="rotationX" class="speed-slider" min="-90" max="90" step="1" value="25" oninput="updateRotationX()" style="width: 80px;">
+                    <span id="rotXValue" style="font-size: 8px;">25°</span>
+                </div>
+                <div class="speed-control">
+                    <label style="font-size: 8px;">Y Rotation:</label>
+                    <input type="range" id="rotationY" class="speed-slider" min="-180" max="180" step="1" value="45" oninput="updateRotationY()" style="width: 80px;">
+                    <span id="rotYValue" style="font-size: 8px;">45°</span>
+                </div>
+            </div>
+            <div class="row">
+                <div class="speed-control">
+                    <label style="font-size: 8px;">Z Rotation:</label>
+                    <input type="range" id="rotationZ" class="speed-slider" min="-180" max="180" step="1" value="0" oninput="updateRotationZ()" style="width: 80px;">
+                    <span id="rotZValue" style="font-size: 8px;">0°</span>
+                </div>
+                <div class="speed-control">
+                    <label style="font-size: 8px;">Zoom:</label>
+                    <input type="range" id="zoomSlider" class="speed-slider" min="0.2" max="5" step="0.1" value="1" oninput="updateZoom()" style="width: 80px;">
+                    <span id="zoomValue" style="font-size: 8px;">100%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="sidebar">
+        <h2>Model Editor</h2>
+        
+        <div class="section add-section">
+            <h3>Add Vertex</h3>
+            <div class="coord-group">
+                <div class="coord">
+                    <label class="label">X</label>
+                    <input type="number" id="newX" value="0" step="50">
+                </div>
+                <div class="coord">
+                    <label class="label">Y</label>
+                    <input type="number" id="newY" value="0" step="50">
+                </div>
+                <div class="coord">
+                    <label class="label">Z</label>
+                    <input type="number" id="newZ" value="0" step="50">
+                </div>
+                <button onclick="addVertex()" class="success">Add</button>
+            </div>
+        </div>
+        
+        <div class="section add-section">
+            <h3>Quick Cube</h3>
+            <div class="coord-group">
+                <div class="coord">
+                    <label class="label">W</label>
+                    <input type="number" id="cubeWidth" value="100" step="10" min="10">
+                </div>
+                <div class="coord">
+                    <label class="label">H</label>
+                    <input type="number" id="cubeHeight" value="100" step="10" min="10">
+                </div>
+                <div class="coord">
+                    <label class="label">D</label>
+                    <input type="number" id="cubeDepth" value="100" step="10" min="10">
+                </div>
+                <button onclick="createQuickCube()" class="success">Create</button>
+            </div>
+        </div>
+        
+        <div class="section add-section">
+            <h3>Add Plane</h3>
+            <div id="planeInputs" class="plane-inputs">
+                <div class="plane-input"><label>V1</label><input type="text" placeholder="0"></div>
+                <div class="plane-input"><label>V2</label><input type="text" placeholder="1"></div>
+                <div class="plane-input"><label>V3</label><input type="text" placeholder="2"></div>
+            </div>
+            <div class="plane-controls">
+                <button onclick="addPlaneInput()">+</button>
+                <button onclick="removePlaneInput()" class="warning">-</button>
+                <button onclick="addPlane()" class="success">Add Plane</button>
+            </div>
+        </div>
+        
+        <div class="collapsible-section">
+            <div class="section-header" onclick="toggleSection('vertices')">
+                <h3 style="margin: 0;">Vertices</h3>
+                <span class="toggle-icon" id="verticesToggle">▼</span>
+            </div>
+            <div class="section-content" id="verticesContent">
+                <div id="vertexList"><div class="empty">No vertices</div></div>
+            </div>
+        </div>
+        
+        <div class="collapsible-section">
+            <div class="section-header" onclick="toggleSection('planes')">
+                <h3 style="margin: 0;">Planes</h3>
+                <span class="toggle-icon" id="planesToggle">▼</span>
+            </div>
+            <div class="section-content" id="planesContent">
+                <div id="planeList"><div class="empty">No planes</div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let vertices = [];
+        let planes = [];
+        let selectedVertex = -1;
+        let selectedVertices = []; // Array of selected vertex indices for multi-selection
+        let multiSelecting = false; // Track if shift is being held
+        let rotating = false;
+        let draggingVertex = false;
+        let draggedVertexIndex = -1;
+        let lastX = 0, lastY = 0;
+        let accumulatedDeltaX = 0; // Accumulated movement for snapping
+        let accumulatedDeltaY = 0; // Accumulated movement for snapping
+        let rotX = 25, rotY = 45, rotZ = 0;
+        let autoRotating = false;
+        let shadingEnabled = false;
+        let autoRotateInterval;
+        let zoom = 1.0;
+        let rotationTime = 0; // Track rotation animation time
+        let rotationType = 'tumble'; // Current rotation type
+        let rotationSpeed = 1.0; // Rotation speed multiplier
+        
+        // Undo system
+        let history = [];
+        let historyIndex = -1;
+        const maxHistorySize = 50;
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 3D Vector utilities
+        class Vector3 {
+            constructor(x, y, z) {
+                this.x = x;
+                this.y = y;
+                this.z = z;
+            }
+            
+            static subtract(a, b) {
+                return new Vector3(a.x - b.x, a.y - b.y, a.z - b.z);
+            }
+            
+            static cross(a, b) {
+                return new Vector3(
+                    a.y * b.z - a.z * b.y,
+                    a.z * b.x - a.x * b.z,
+                    a.x * b.y - a.y * b.x
+                );
+            }
+            
+            static dot(a, b) {
+                return a.x * b.x + a.y * b.y + a.z * b.z;
+            }
+            
+            magnitude() {
+                return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+            }
+            
+            normalize() {
+                const mag = this.magnitude();
+                if (mag === 0) return new Vector3(0, 0, 0);
+                return new Vector3(this.x / mag, this.y / mag, this.z / mag);
+            }
+        }
+        
+        // Helper function to find vertex at screen coordinates
+        function getVertexAtPosition(x, y) {
+            for (let i = 0; i < vertices.length; i++) {
+                const p = project(vertices[i]);
+                if (p.clipped) continue;
+                
+                const radius = Math.max(8, 12 * p.scale); // Slightly larger hit area
+                const distance = Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2);
+                
+                if (distance <= radius) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+        
+        // Convert screen movement to 3D coordinate changes
+        function screenMovementTo3D(deltaX, deltaY, vertexIndex) {
+            const vertex = vertices[vertexIndex];
+            const projected = project(vertex);
+            
+            // Scale factor based on perspective
+            const scaleFactor = 1 / projected.scale;
+            
+            // Convert screen delta to 3D delta (accounting for current rotation)
+            const radX = rotX * Math.PI / 180;
+            const radY = rotY * Math.PI / 180;
+            
+            // Apply inverse rotation to convert screen movement to world coordinates
+            const worldDeltaX = (deltaX * Math.cos(radY) + deltaY * Math.sin(radX) * Math.sin(radY)) * scaleFactor;
+            const worldDeltaY = (deltaY * Math.cos(radX)) * scaleFactor;
+            const worldDeltaZ = (-deltaX * Math.sin(radY) + deltaY * Math.sin(radX) * Math.cos(radY)) * scaleFactor;
+            
+            return { x: worldDeltaX, y: worldDeltaY, z: worldDeltaZ };
+        }
+        function rotate3D(point, rx, ry, rz) {
+            const radX = rx * Math.PI / 180;
+            const radY = ry * Math.PI / 180;
+            const radZ = rz * Math.PI / 180;
+            
+            let x = point.x;
+            let y = point.y;
+            let z = point.z;
+            
+            // Rotate around Z axis (roll)
+            let newX = x * Math.cos(radZ) - y * Math.sin(radZ);
+            let newY = x * Math.sin(radZ) + y * Math.cos(radZ);
+            x = newX;
+            y = newY;
+            
+            // Rotate around Y axis (yaw)
+            newX = x * Math.cos(radY) - z * Math.sin(radY);
+            let newZ = x * Math.sin(radY) + z * Math.cos(radY);
+            x = newX;
+            z = newZ;
+            
+            // Rotate around X axis (pitch)
+            newY = y * Math.cos(radX) - z * Math.sin(radX);
+            newZ = y * Math.sin(radX) + z * Math.cos(radX);
+            
+            return { x, y: newY, z: newZ };
+        }
+        
+        // Calculate model bounds
+        function getBounds() {
+            if (vertices.length === 0) return { width: 100, height: 100, depth: 100 };
+            
+            let minX = vertices[0].x, maxX = vertices[0].x;
+            let minY = vertices[0].y, maxY = vertices[0].y;
+            let minZ = vertices[0].z, maxZ = vertices[0].z;
+            
+            vertices.forEach(v => {
+                minX = Math.min(minX, v.x);
+                maxX = Math.max(maxX, v.x);
+                minY = Math.min(minY, v.y);
+                maxY = Math.max(maxY, v.y);
+                minZ = Math.min(minZ, v.z);
+                maxZ = Math.max(maxZ, v.z);
+            });
+            
+            return {
+                width: maxX - minX,
+                height: maxY - minY,
+                depth: maxZ - minZ
+            };
+        }
+        
+        // Project 3D point to 2D screen
+        function project(vertex) {
+            const rotated = rotate3D(vertex, rotX, rotY, rotZ);
+            
+            // Calculate shape size for auto-zoom
+            const bounds = getBounds();
+            const shapeSize = Math.max(bounds.width, bounds.height, bounds.depth);
+            
+            // Auto-zoom: larger shapes = farther away, smaller shapes = closer
+            const baseDistance = 600;
+            const zoomFactor = Math.max(0.3, Math.min(3.0, 150 / shapeSize));
+            const viewerDistance = baseDistance / zoomFactor;
+            
+            // Apply user zoom
+            const finalViewerDistance = viewerDistance / zoom;
+            
+            // Perspective projection with auto-zoom
+            const focalLength = 500;
+            const nearClip = 50;
+            
+            // Clip objects too close to viewer
+            const adjustedZ = Math.max(rotated.z, -finalViewerDistance + nearClip);
+            const perspectiveFactor = focalLength / (finalViewerDistance + adjustedZ);
+            
+            return {
+                x: canvas.width / 2 + rotated.x * perspectiveFactor,
+                y: canvas.height / 2 + rotated.y * perspectiveFactor,
+                z: rotated.z, // Use raw Z for depth sorting
+                scale: perspectiveFactor,
+                clipped: rotated.z < -finalViewerDistance + nearClip
+            };
+        }
+        
+        // Calculate lighting for a plane
+        function calculateLighting(plane) {
+            // Get the first 3 vertices of the plane for normal calculation
+            const p1 = rotate3D(vertices[plane[0]], rotX, rotY, rotZ);
+            const p2 = rotate3D(vertices[plane[1]], rotX, rotY, rotZ);
+            const p3 = rotate3D(vertices[plane[2]], rotX, rotY, rotZ);
+            
+            // Calculate face normal
+            const v1 = new Vector3(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+            const v2 = new Vector3(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z);
+            const normal = Vector3.cross(v1, v2).normalize();
+            
+            // Primary light from top-right-front
+            const mainLight = new Vector3(0.7, -0.5, 0.8).normalize();
+            const mainIntensity = Math.max(0, Vector3.dot(normal, mainLight));
+            
+            // Secondary fill light from left
+            const fillLight = new Vector3(-0.3, 0.2, 0.4).normalize();
+            const fillIntensity = Math.max(0, Vector3.dot(normal, fillLight)) * 0.3;
+            
+            // Ambient light base
+            const ambient = 0.2;
+            
+            // Combine lighting with enhanced contrast
+            const totalIntensity = ambient + mainIntensity * 0.7 + fillIntensity;
+            return Math.min(1.0, totalIntensity);
+        }
+        
+        // Check if face is visible (back-face culling) - FIXED
+        function isFaceVisible(plane) {
+            if (plane.length < 3) return false;
+            
+            // Project vertices to screen space for 2D normal calculation
+            const projectedVertices = plane.map(index => project(vertices[index]));
+            
+            // Skip if any vertex is clipped
+            if (projectedVertices.some(p => p.clipped)) return false;
+            
+            const p1 = projectedVertices[0];
+            const p2 = projectedVertices[1];
+            const p3 = projectedVertices[2];
+            
+            // Calculate 2D cross product to determine winding order
+            const v1x = p2.x - p1.x;
+            const v1y = p2.y - p1.y;
+            const v2x = p3.x - p1.x;
+            const v2y = p3.y - p1.y;
+            
+            const crossProduct = v1x * v2y - v1y * v2x;
+            
+            // Face is visible if vertices are in counter-clockwise order (positive cross product)
+            return crossProduct > 0;
+        }
+        
+        // Vertex management functions
+        function addVertex() {
+            saveState(); // Save state before making changes
+            
+            const x = parseFloat(document.getElementById('newX').value) || 0;
+            const y = parseFloat(document.getElementById('newY').value) || 0;
+            const z = parseFloat(document.getElementById('newZ').value) || 0;
+            
+            vertices.push({ x, y, z });
+            selectedVertex = vertices.length - 1;
+            
+            // Clear input fields
+            document.getElementById('newX').value = '0';
+            document.getElementById('newY').value = '0';
+            document.getElementById('newZ').value = '0';
+            
+            updateUI();
+            render();
+        }
+        
+        function deleteVertex(index) {
+            saveState(); // Save state before making changes
+            
+            vertices.splice(index, 1);
+            
+            // Update planes to remove references to deleted vertex
+            planes = planes.filter(plane => !plane.includes(index))
+                          .map(plane => plane.map(i => i > index ? i - 1 : i));
+            
+            if (selectedVertex >= vertices.length) {
+                selectedVertex = vertices.length - 1;
+            }
+            
+            updateUI();
+            render();
+        }
+        
+        function updateVertex(index, coord, value) {
+            if (vertices[index]) {
+                vertices[index][coord] = parseFloat(value) || 0;
+                render();
+            }
+        }
+        
+        function selectVertex(index) {
+            selectedVertex = index;
+            updateUI();
+            render();
+        }
+        
+        // Plane management functions
+        function addPlaneInput() {
+            const container = document.getElementById('planeInputs');
+            const count = container.children.length;
+            
+            const input = document.createElement('div');
+            input.className = 'plane-input';
+            input.innerHTML = `<label>V${count + 1}</label><input type="text" placeholder="${count}">`;
+            container.appendChild(input);
+        }
+        
+        function removePlaneInput() {
+            const container = document.getElementById('planeInputs');
+            if (container.children.length > 3) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        
+        function orderVerticesForConvexPolygon(indices) {
+            const points = indices.map(i => vertices[i]);
+            const centroid = { 
+                x: points.reduce((sum, p) => sum + p.x, 0) / points.length, 
+                y: points.reduce((sum, p) => sum + p.y, 0) / points.length, 
+                z: points.reduce((sum, p) => sum + p.z, 0) / points.length 
+            };
+            
+            const v1 = new Vector3(points[1].x - points[0].x, points[1].y - points[0].y, points[1].z - points[0].z);
+            const v2 = new Vector3(points[2].x - points[0].x, points[2].y - points[0].y, points[2].z - points[0].z);
+            const normal = Vector3.cross(v1, v2);
+            
+            const u = v1.normalize();
+            const v = Vector3.cross(normal, u).normalize();
+            
+            const pointsWithAngles = indices.map((index, i) => {
+                const point = points[i];
+                const relativePoint = new Vector3(point.x - centroid.x, point.y - centroid.y, point.z - centroid.z);
+                const u_coord = Vector3.dot(relativePoint, u);
+                const v_coord = Vector3.dot(relativePoint, v);
+                const angle = Math.atan2(v_coord, u_coord);
+                return { index, angle };
+            });
+            
+            pointsWithAngles.sort((a, b) => a.angle - b.angle);
+            return pointsWithAngles.map(item => item.index);
+        }
+        
+        function addPlane() {
+            const inputs = document.querySelectorAll('#planeInputs input');
+            const indices = [];
+            
+            inputs.forEach(input => {
+                const value = parseInt(input.value);
+                if (!isNaN(value) && value >= 0 && value < vertices.length) {
+                    indices.push(value);
+                }
+            });
+            
+            if (indices.length < 3) {
+                alert('Need at least 3 valid vertex indices');
+                return;
+            }
+            
+            if (new Set(indices).size !== indices.length) {
+                alert('All vertices must be different');
+                return;
+            }
+            
+            // Order vertices properly for polygons with 4+ vertices
+            let orderedIndices;
+            if (indices.length >= 4) {
+                orderedIndices = orderVerticesForConvexPolygon(indices);
+            } else {
+                orderedIndices = [...indices];
+            }
+            
+            // Ensure the plane faces towards the viewer
+            orderedIndices = ensurePlaneFactsViewer(orderedIndices);
+            
+            planes.push(orderedIndices);
+            
+            // Clear input fields
+            inputs.forEach(input => input.value = '');
+            
+            updateUI();
+            render();
+        }
+        
+        // Function to ensure plane faces towards viewer
+        function ensurePlaneFactsViewer(indices) {
+            if (indices.length < 3) return indices;
+            
+            // Get the first 3 vertices for face normal calculation
+            const p1 = rotate3D(vertices[indices[0]], rotX, rotY, rotZ);
+            const p2 = rotate3D(vertices[indices[1]], rotX, rotY, rotZ);
+            const p3 = rotate3D(vertices[indices[2]], rotX, rotY, rotZ);
+            
+            // Calculate 2D cross product in screen space to determine winding order
+            const proj1 = project(vertices[indices[0]]);
+            const proj2 = project(vertices[indices[1]]);
+            const proj3 = project(vertices[indices[2]]);
+            
+            const v1x = proj2.x - proj1.x;
+            const v1y = proj2.y - proj1.y;
+            const v2x = proj3.x - proj1.x;
+            const v2y = proj3.y - proj1.y;
+            
+            const crossProduct = v1x * v2y - v1y * v2x;
+            
+            // If cross product is negative, vertices are in clockwise order (facing away)
+            // Reverse the order to make them face towards viewer
+            if (crossProduct < 0) {
+                return [...indices].reverse();
+            }
+            
+            return indices;
+        }
+        
+        // Function to remove all planes that contain a specific vertex
+        function removePlanesContainingVertex(vertexIndex) {
+            planes = planes.filter(plane => !plane.includes(vertexIndex));
+        }
+        
+        // Undo system functions
+        function saveState() {
+            // Remove any future history if we're not at the end
+            if (historyIndex < history.length - 1) {
+                history = history.slice(0, historyIndex + 1);
+            }
+            
+            // Create deep copy of current state
+            const state = {
+                vertices: JSON.parse(JSON.stringify(vertices)),
+                planes: JSON.parse(JSON.stringify(planes)),
+                selectedVertex: selectedVertex
+            };
+            
+            history.push(state);
+            historyIndex = history.length - 1;
+            
+            // Limit history size
+            if (history.length > maxHistorySize) {
+                history.shift();
+                historyIndex--;
+            }
+            
+            console.log('State saved. History length:', history.length, 'Index:', historyIndex);
+        }
+        
+        function undo() {
+            console.log('Undo called. History length:', history.length, 'Current index:', historyIndex);
+            
+            if (historyIndex > 0) {
+                historyIndex--;
+                const state = history[historyIndex];
+                
+                console.log('Undoing to state:', state);
+                
+                // Restore state
+                vertices = JSON.parse(JSON.stringify(state.vertices));
+                planes = JSON.parse(JSON.stringify(state.planes));
+                selectedVertex = state.selectedVertex;
+                
+                // Clear selections
+                selectedVertices = [];
+                multiSelecting = false;
+                
+                updateUI();
+                render();
+            } else {
+                console.log('Cannot undo - at beginning of history');
+            }
+        }
+        
+        function redo() {
+            console.log('Redo called. History length:', history.length, 'Current index:', historyIndex);
+            
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                const state = history[historyIndex];
+                
+                console.log('Redoing to state:', state);
+                
+                // Restore state
+                vertices = JSON.parse(JSON.stringify(state.vertices));
+                planes = JSON.parse(JSON.stringify(state.planes));
+                selectedVertex = state.selectedVertex;
+                
+                // Clear selections
+                selectedVertices = [];
+                multiSelecting = false;
+                
+                updateUI();
+                render();
+            } else {
+                console.log('Cannot redo - at end of history');
+            }
+        }
+        
+        function deletePlane(index) {
+            planes.splice(index, 1);
+            updateUI();
+            render();
+        }
+        
+        // Quick cube creation with custom dimensions
+        function createQuickCube() {
+            saveState(); // Save state before making changes
+            
+            // Get dimensions from input fields
+            const width = parseFloat(document.getElementById('cubeWidth').value) || 100;
+            const height = parseFloat(document.getElementById('cubeHeight').value) || 100;
+            const depth = parseFloat(document.getElementById('cubeDepth').value) || 100;
+            
+            // Clear existing model
+            vertices = [];
+            planes = [];
+            selectedVertex = -1;
+            
+            const w = width / 2;   // Half width
+            const h = height / 2;  // Half height
+            const d = depth / 2;   // Half depth
+            
+            // Create 8 vertices for a rectangular box/cube
+            const boxVertices = [
+                [-w, -h, -d], // 0: back-bottom-left
+                [w, -h, -d],  // 1: back-bottom-right
+                [w, h, -d],   // 2: back-top-right
+                [-w, h, -d],  // 3: back-top-left
+                [-w, -h, d],  // 4: front-bottom-left
+                [w, -h, d],   // 5: front-bottom-right
+                [w, h, d],    // 6: front-top-right
+                [-w, h, d]    // 7: front-top-left
+            ];
+            
+            // Add all vertices
+            boxVertices.forEach(([x, y, z]) => {
+                vertices.push({ x, y, z });
+            });
+            
+            // Create 6 faces of the box - FIXED winding order for consistent normals
+            const boxFaces = [
+                [0, 1, 2, 3], // Back face (CCW from outside)
+                [4, 7, 6, 5], // Front face (CCW from outside)
+                [0, 4, 5, 1], // Bottom face (CCW from outside)
+                [2, 6, 7, 3], // Top face (CCW from outside)
+                [0, 3, 7, 4], // Left face (CCW from outside)
+                [1, 5, 6, 2]  // Right face (CCW from outside)
+            ];
+            
+            // Add all faces
+            boxFaces.forEach(face => {
+                planes.push([...face]);
+            });
+            
+            selectedVertex = 0;
+            updateUI();
+            render();
+        }
+        
+        // Main rendering function - FIXED depth sorting
+        function render() {
+            // Clear with transparent background for PNG export
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (vertices.length === 0 && planes.length === 0) return;
+            
+            // Sort ALL planes by average Z coordinate (including back faces when not using 3D shading)
+            const sortedPlanes = planes.map((plane, index) => {
+                const avgZ = plane.reduce((sum, i) => {
+                    const rotated = rotate3D(vertices[i], rotX, rotY, rotZ);
+                    return sum + rotated.z;
+                }, 0) / plane.length;
+                const visible = isFaceVisible(plane);
+                return { plane, index, avgZ, visible, isFrontFace: visible };
+            }).sort((a, b) => b.avgZ - a.avgZ); // Sort by Z (near to far)
+            
+            // Draw planes (including back faces when 3D shading is off)
+            if (shadingEnabled) {
+                // Only draw front faces in 3D shading mode
+                sortedPlanes.filter(p => p.visible).forEach(({ plane }) => drawPlane(plane, true));
+            } else {
+                // Draw all planes, distinguishing front from back
+                sortedPlanes.forEach(({ plane, isFrontFace }) => drawPlane(plane, isFrontFace));
+            }
+            
+            // Draw vertices and lines (only in normal mode)
+            if (!shadingEnabled) {
+                drawConnectionLines();
+                drawVertices();
+            }
+        }
+        
+        function drawPlane(plane, isFrontFace = true) {
+            const projectedVertices = plane.map(index => project(vertices[index]));
+            if (projectedVertices.length < 3) return;
+            if (projectedVertices.some(p => p.clipped)) return;
+            
+            ctx.beginPath();
+            ctx.moveTo(projectedVertices[0].x, projectedVertices[0].y);
+            for (let i = 1; i < projectedVertices.length; i++) {
+                ctx.lineTo(projectedVertices[i].x, projectedVertices[i].y);
+            }
+            ctx.closePath();
+            
+            if (shadingEnabled) {
+                // Calculate lighting
+                const brightness = calculateLighting(plane);
+                
+                // Enhanced shading with better color range
+                const baseColor = 180; // Lighter base
+                const contrast = 130; // Higher contrast range
+                const colorValue = Math.floor(baseColor - (1 - brightness) * contrast);
+                const finalColor = Math.max(30, Math.min(255, colorValue));
+                
+                ctx.fillStyle = `rgb(${finalColor}, ${finalColor}, ${finalColor})`;
+                ctx.fill();
+                
+                // Subtle edge enhancement - much softer borders
+                const edgeColor = Math.max(20, finalColor - 40); // Darker but not black
+                ctx.strokeStyle = `rgb(${edgeColor}, ${edgeColor}, ${edgeColor})`;
+                ctx.lineWidth = 0.5; // Thinner lines
+                ctx.stroke();
+            } else {
+                // Different colors for front and back faces
+                if (isFrontFace) {
+                    // Front face - blue
+                    ctx.fillStyle = 'hsla(220, 70%, 60%, 0.3)';
+                    ctx.strokeStyle = 'hsla(220, 70%, 30%, 0.6)';
+                } else {
+                    // Back face - red
+                    ctx.fillStyle = 'hsla(0, 70%, 60%, 0.3)';
+                    ctx.strokeStyle = 'hsla(0, 70%, 30%, 0.6)';
+                }
+                ctx.lineWidth = 1; // Thinner border
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+        
+        function drawConnectionLines() {
+            for (let i = 0; i < vertices.length - 1; i++) {
+                for (let j = i + 1; j < vertices.length; j++) {
+                    const p1 = project(vertices[i]);
+                    const p2 = project(vertices[j]);
+                    
+                    if (p1.clipped || p2.clipped) continue;
+                    
+                    const avgScale = (p1.scale + p2.scale) / 2;
+                    const opacity = Math.max(0.02, Math.min(0.08, avgScale * 0.1)); // Much lower opacity
+                    
+                    ctx.strokeStyle = `rgba(150,150,150,${opacity})`; // Light gray, very transparent
+                    ctx.lineWidth = Math.max(0.3, avgScale * 0.8); // Thinner lines
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+        }
+        
+        function drawVertices() {
+            // Sort vertices by depth for proper rendering order
+            const sortedVertices = vertices.map((vertex, index) => ({
+                vertex, index, z: project(vertex).z
+            })).sort((a, b) => b.z - a.z); // Sort by Z (near to far)
+            
+            // Draw vertices
+            sortedVertices.forEach(({ vertex, index: i }) => {
+                const p = project(vertex);
+                if (p.clipped) return;
+                
+                const radius = Math.max(2, 6 * p.scale);
+                const isSelected = i === selectedVertex;
+                const isMultiSelected = selectedVertices.includes(i);
+                const opacity = Math.max(0.3, Math.min(1.0, p.scale * 1.5));
+                const shadowOffset = Math.max(1, 2 * p.scale);
+                
+                // Shadow
+                ctx.fillStyle = `rgba(0,0,0,1)`;
+                ctx.beginPath();
+                ctx.arc(p.x + shadowOffset, p.y + shadowOffset, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Multi-selection ring (green)
+                if (isMultiSelected) {
+                    ctx.strokeStyle = `rgba(46, 204, 113, 1)`;
+                    ctx.lineWidth = Math.max(1, 2 * p.scale);
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, radius + 4 * p.scale, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Selection ring (red)
+                if (isSelected) {
+                    ctx.strokeStyle = `rgba(231, 76, 60, 1)`;
+                    ctx.lineWidth = Math.max(1, 3 * p.scale);
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, radius + 3 * p.scale, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Main circle
+                const hue = ((vertex.z + 100) % 360);
+                let brightness = isSelected ? 60 : 50;
+                if (isMultiSelected) brightness = 70; // Brighter for multi-selected
+                
+                ctx.fillStyle = `hsla(${hue}, 70%, ${brightness}%, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Highlight
+                ctx.fillStyle = `hsla(${hue}, 50%, 70%, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(p.x - radius * 0.2, p.y - radius * 0.2, radius * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Label
+                const fontSize = Math.max(6, 10 * p.scale);
+                ctx.fillStyle = `rgba(0,0,0,1)`;
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText(i.toString(), p.x, p.y + fontSize * 0.3);
+            });
+        }
+        
+        // UI update functions
+        function updateUI() {
+            document.getElementById('stats').textContent = `Vertices: ${vertices.length} | Planes: ${planes.length}`;
+            document.getElementById('rotation').textContent = `${rotX.toFixed(0)}°, ${rotY.toFixed(0)}°, ${rotZ.toFixed(0)}° | Zoom: ${(zoom * 100).toFixed(0)}%`;
+            
+            // Update slider values
+            document.getElementById('rotationX').value = rotX;
+            document.getElementById('rotationY').value = rotY;
+            document.getElementById('rotationZ').value = rotZ;
+            document.getElementById('zoomSlider').value = zoom;
+            document.getElementById('rotXValue').textContent = rotX.toFixed(0) + '°';
+            document.getElementById('rotYValue').textContent = rotY.toFixed(0) + '°';
+            document.getElementById('rotZValue').textContent = rotZ.toFixed(0) + '°';
+            document.getElementById('zoomValue').textContent = (zoom * 100).toFixed(0) + '%';
+            
+            updateVertexList();
+            updatePlaneList();
+        }
+        
+        function updateVertexList() {
+            const container = document.getElementById('vertexList');
+            if (vertices.length === 0) {
+                container.innerHTML = '<div class="empty">No vertices</div>';
+                return;
+            }
+            
+            container.innerHTML = vertices.map((vertex, i) => `
+                <div class="item ${i === selectedVertex ? 'selected' : ''}" onclick="selectVertex(${i})">
+                    <div class="item-header">
+                        <span class="item-title">V${i}</span>
+                        <button class="danger" onclick="event.stopPropagation(); deleteVertex(${i})">Del</button>
+                    </div>
+                    <div class="coords">
+                        <div class="coord">
+                            <label class="label">X</label>
+                            <input type="number" step="50" value="${vertex.x.toFixed(1)}" onchange="updateVertex(${i}, 'x', this.value)" onclick="event.stopPropagation()">
+                        </div>
+                        <div class="coord">
+                            <label class="label">Y</label>
+                            <input type="number" step="50" value="${vertex.y.toFixed(1)}" onchange="updateVertex(${i}, 'y', this.value)" onclick="event.stopPropagation()">
+                        </div>
+                        <div class="coord">
+                            <label class="label">Z</label>
+                            <input type="number" step="50" value="${vertex.z.toFixed(1)}" onchange="updateVertex(${i}, 'z', this.value)" onclick="event.stopPropagation()">
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function updatePlaneList() {
+            const container = document.getElementById('planeList');
+            if (planes.length === 0) {
+                container.innerHTML = '<div class="empty">No planes</div>';
+                return;
+            }
+            
+            container.innerHTML = planes.map((plane, i) => `
+                <div class="item">
+                    <div class="item-header">
+                        <span class="item-title">P${i} (${plane.join(', ')})</span>
+                        <button class="danger" onclick="deletePlane(${i})">Del</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Control functions
+        function clearAll() {
+            vertices = [];
+            planes = [];
+            selectedVertex = -1;
+            updateUI();
+            render();
+        }
+        
+        function resetView() {
+            rotX = 25;
+            rotY = 45;
+            rotZ = 0;
+            zoom = 1.0;
+            updateUI();
+            render();
+        }
+        
+        function snapToGrid() {
+            if (vertices.length === 0) {
+                alert('No vertices to snap to grid');
+                return;
+            }
+            
+            // Round all vertex coordinates to nearest 10
+            vertices.forEach(vertex => {
+                vertex.x = Math.round(vertex.x / 10) * 10;
+                vertex.y = Math.round(vertex.y / 10) * 10;
+                vertex.z = Math.round(vertex.z / 10) * 10;
+            });
+            
+            updateUI();
+            render();
+        }
+        
+        function toggleAutoRotate() {
+            autoRotating = document.getElementById('autoRotate').checked;
+            
+            if (autoRotating) {
+                rotationTime = 0; // Reset animation time
+                autoRotateInterval = setInterval(() => {
+                    rotationTime += 1;
+                    
+                    // Get rotation values based on selected type
+                    const [newRotX, newRotY] = getRotationValues(rotationType, rotationTime);
+                    rotX = newRotX;
+                    rotY = newRotY;
+                    
+                    updateUI();
+                    render();
+                }, 50);
+            } else {
+                clearInterval(autoRotateInterval);
+            }
+        }
+        
+        function toggleShading() {
+            shadingEnabled = document.getElementById('shadingMode').checked;
+            render();
+        }
+        
+        // Get rotation values based on type and time
+        function getRotationValues(type, time) {
+            const t = time * 0.02 * rotationSpeed; // Apply speed multiplier
+            
+            switch (type) {
+                case 'tumble':
+                    return [t * 25, t * 40]; // Classic tumbling motion
+                case 'spinX':
+                    return [t * 60, 0]; // Spin around X axis only
+                case 'spinY':
+                    return [0, t * 60]; // Spin around Y axis only
+                case 'spinZ':
+                    return [t * 45, t * 45]; // Diagonal spin
+                case 'orbit':
+                    return [20 + Math.sin(t * 0.8) * 15, t * 25]; // Orbital motion with wobble
+                case 'wobble':
+                    return [Math.sin(t * 0.6) * 45, Math.cos(t * 0.7) * 45]; // Figure-8 wobble
+                default:
+                    return [t * 25, t * 40];
+            }
+        }
+        
+        function updateRotationType() {
+            rotationType = document.getElementById('rotationType').value;
+        }
+        
+        function updateSpeed() {
+            rotationSpeed = parseFloat(document.getElementById('rotationSpeed').value);
+            document.getElementById('speedValue').textContent = rotationSpeed.toFixed(1) + 'x';
+        }
+        
+        function updateRotationX() {
+            rotX = parseFloat(document.getElementById('rotationX').value);
+            document.getElementById('rotXValue').textContent = rotX + '°';
+            
+            // If auto-rotating, this will override the auto rotation temporarily
+            if (autoRotating) {
+                clearInterval(autoRotateInterval);
+                autoRotating = false;
+                document.getElementById('autoRotate').checked = false;
+            }
+            
+            updateUI();
+            render();
+        }
+        
+        function updateRotationY() {
+            rotY = parseFloat(document.getElementById('rotationY').value);
+            document.getElementById('rotYValue').textContent = rotY + '°';
+            
+            // If auto-rotating, this will override the auto rotation temporarily
+            if (autoRotating) {
+                clearInterval(autoRotateInterval);
+                autoRotating = false;
+                document.getElementById('autoRotate').checked = false;
+            }
+            
+            updateUI();
+            render();
+        }
+        
+        function updateRotationZ() {
+            rotZ = parseFloat(document.getElementById('rotationZ').value);
+            document.getElementById('rotZValue').textContent = rotZ + '°';
+            
+            // If auto-rotating, this will override the auto rotation temporarily
+            if (autoRotating) {
+                clearInterval(autoRotateInterval);
+                autoRotating = false;
+                document.getElementById('autoRotate').checked = false;
+            }
+            
+            updateUI();
+            render();
+        }
+        
+        function updateZoom() {
+            zoom = parseFloat(document.getElementById('zoomSlider').value);
+            document.getElementById('zoomValue').textContent = (zoom * 100).toFixed(0) + '%';
+            updateUI();
+            render();
+        }
+        
+        function toggleSection(sectionName) {
+            const content = document.getElementById(sectionName + 'Content');
+            const toggle = document.getElementById(sectionName + 'Toggle');
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+                toggle.textContent = '▼';
+            } else {
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                toggle.textContent = '▼';
+            }
+        }
+        
+        function savePNG() {
+            // Create a temporary canvas with transparent background
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            
+            // Save current canvas content to temp canvas
+            tempCtx.drawImage(canvas, 0, 0);
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.download = '3d-model.png';
+            link.href = tempCanvas.toDataURL('image/png');
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Event handlers
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = 0.15;
+            
+            if (e.deltaY < 0) {
+                zoom *= (1 + zoomFactor); // Zoom in
+            } else {
+                zoom *= (1 - zoomFactor); // Zoom out
+            }
+            
+            zoom = Math.max(0.2, Math.min(10.0, zoom));
+            updateUI();
+            render();
+        });
+        
+        // Keyboard event listeners for shift detection
+        document.addEventListener('keydown', (e) => {
+            // Handle undo/redo shortcuts FIRST
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                undo();
+                return false;
+            }
+            
+            if (e.ctrlKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                redo();
+                return false;
+            }
+            
+            // Disable multi-selection when shading is enabled
+            if (shadingEnabled) return;
+            
+            if (e.key === 'Shift' && !multiSelecting) {
+                multiSelecting = true;
+                selectedVertices = []; // Clear previous selection when starting new multi-select
+                canvas.style.cursor = 'crosshair';
+                render(); // Update display
+            }
+            
+            // Developer tools prevention
+            if (e.key === 'F12') {
+                e.preventDefault();
+                return false;
+            }
+            if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                e.preventDefault();
+                return false;
+            }
+            if (e.ctrlKey && e.key === 'u') {
+                e.preventDefault();
+                return false;
+            }
+            if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                e.preventDefault();
+                return false;
+            }
+            if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+                e.preventDefault();
+                return false;
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            // Disable multi-selection when shading is enabled
+            if (shadingEnabled) return;
+            
+            if (e.key === 'Shift' && multiSelecting) {
+                multiSelecting = false;
+                canvas.style.cursor = 'grab';
+                
+                // If 3 or more vertices were selected, create a plane
+                if (selectedVertices.length >= 3) {
+                    saveState(); // Save state before making changes
+                    
+                    // Order vertices properly for polygons with 4+ vertices
+                    let orderedIndices;
+                    if (selectedVertices.length >= 4) {
+                        orderedIndices = orderVerticesForConvexPolygon(selectedVertices);
+                    } else {
+                        orderedIndices = [...selectedVertices];
+                    }
+                    
+                    // Ensure the plane faces towards the viewer
+                    orderedIndices = ensurePlaneFactsViewer(orderedIndices);
+                    
+                    planes.push(orderedIndices);
+                    updateUI();
+                }
+                
+                // Clear selection
+                selectedVertices = [];
+                render();
+            }
+        });
+        
+        canvas.addEventListener('mousedown', (e) => {
+            // Disable vertex interaction when shading is enabled
+            if (shadingEnabled) {
+                // Only allow view rotation in shading mode
+                if (!autoRotating && !multiSelecting) {
+                    rotating = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    canvas.classList.add('grabbing');
+                }
+                return;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Check if clicking on a vertex
+            const vertexIndex = getVertexAtPosition(x, y);
+            
+            if (multiSelecting && vertexIndex !== -1) {
+                // Multi-select mode: toggle vertex selection
+                if (selectedVertices.includes(vertexIndex)) {
+                    // Remove from selection
+                    selectedVertices = selectedVertices.filter(i => i !== vertexIndex);
+                } else {
+                    // Add to selection
+                    selectedVertices.push(vertexIndex);
+                }
+                render();
+                return; // Don't do other actions in multi-select mode
+            }
+            
+            if (vertexIndex !== -1 && !autoRotating) {
+                // Start dragging vertex (only if not multi-selecting)
+                saveState(); // Save state before making changes
+                
+                draggingVertex = true;
+                draggedVertexIndex = vertexIndex;
+                selectedVertex = vertexIndex;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                accumulatedDeltaX = 0; // Reset accumulation
+                accumulatedDeltaY = 0; // Reset accumulation
+                canvas.style.cursor = 'move';
+                
+                // Remove all planes that contain this vertex
+                removePlanesContainingVertex(vertexIndex);
+                
+                updateUI();
+                render();
+            } else if (!autoRotating && !multiSelecting) {
+                // Start rotating view (only if not multi-selecting)
+                rotating = true;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                canvas.classList.add('grabbing');
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // In shading mode, only allow view rotation
+            if (shadingEnabled) {
+                if (rotating && !autoRotating && !multiSelecting) {
+                    // Rotate view
+                    const deltaX = e.clientX - lastX;
+                    const deltaY = e.clientY - lastY;
+                    
+                    rotY += deltaX * 0.5;
+                    rotX += deltaY * 0.5;
+                    rotX = Math.max(-90, Math.min(90, rotX));
+                    
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    
+                    updateUI();
+                    render();
+                }
+                // Always show grab cursor in shading mode
+                canvas.style.cursor = rotating ? 'grabbing' : 'grab';
+                return;
+            }
+            
+            if (draggingVertex && draggedVertexIndex !== -1 && !multiSelecting) {
+                // Drag vertex with 10-pixel snapping (only if not multi-selecting)
+                const deltaX = e.clientX - lastX;
+                const deltaY = e.clientY - lastY;
+                
+                // Accumulate movement
+                accumulatedDeltaX += deltaX;
+                accumulatedDeltaY += deltaY;
+                
+                // Check if we've accumulated enough movement for a 10-pixel step
+                const stepX = Math.floor(Math.abs(accumulatedDeltaX) / 10) * Math.sign(accumulatedDeltaX);
+                const stepY = Math.floor(Math.abs(accumulatedDeltaY) / 10) * Math.sign(accumulatedDeltaY);
+                
+                if (stepX !== 0 || stepY !== 0) {
+                    // Apply the movement
+                    const worldDelta = screenMovementTo3D(stepX * 10, stepY * 10, draggedVertexIndex);
+                    
+                    vertices[draggedVertexIndex].x += worldDelta.x;
+                    vertices[draggedVertexIndex].y += worldDelta.y;
+                    vertices[draggedVertexIndex].z += worldDelta.z;
+                    
+                    // Subtract the applied movement from accumulation
+                    accumulatedDeltaX -= stepX * 10;
+                    accumulatedDeltaY -= stepY * 10;
+                    
+                    updateUI();
+                    render();
+                }
+                
+                lastX = e.clientX;
+                lastY = e.clientY;
+            } else if (rotating && !autoRotating && !multiSelecting) {
+                // Rotate view (only if not multi-selecting)
+                const deltaX = e.clientX - lastX;
+                const deltaY = e.clientY - lastY;
+                
+                rotY += deltaX * 0.5;
+                rotX += deltaY * 0.5;
+                rotX = Math.max(-90, Math.min(90, rotX));
+                
+                lastX = e.clientX;
+                lastY = e.clientY;
+                
+                updateUI();
+                render();
+            } else if (!multiSelecting) {
+                // Update cursor based on what's under mouse (normal mode)
+                const vertexIndex = getVertexAtPosition(x, y);
+                if (vertexIndex !== -1) {
+                    canvas.style.cursor = 'move';
+                } else {
+                    canvas.style.cursor = 'grab';
+                }
+            }
+            // In multi-select mode, cursor remains as crosshair
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            rotating = false;
+            draggingVertex = false;
+            draggedVertexIndex = -1;
+            canvas.classList.remove('grabbing');
+            canvas.style.cursor = 'grab';
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            rotating = false;
+            draggingVertex = false;
+            draggedVertexIndex = -1;
+            canvas.classList.remove('grabbing');
+            canvas.style.cursor = 'grab';
+        });
+        
+        // Initialize the application
+        updateSpeed(); // Initialize speed display
+        updateUI();
+        render();
+        
+        // Disable right-click context menu
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            return false;
+        });
+
+        // Disable F12, Ctrl+Shift+I, Ctrl+U, and other developer shortcuts
+        document.addEventListener('keydown', (e) => {
+            // F12
+            if (e.key === 'F12') {
+                e.preventDefault();
+                return false;
+            }
+            // Ctrl+Shift+I (Developer Tools)
+            if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                e.preventDefault();
+                return false;
+            }
+            // Ctrl+U (View Source)
+            if (e.ctrlKey && e.key === 'u') {
+                e.preventDefault();
+                return false;
+            }
+            // Ctrl+Shift+C (Element Inspector)
+            if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                e.preventDefault();
+                return false;
+            }
+            // Ctrl+Shift+J (Console)
+            if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>
